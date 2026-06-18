@@ -1,0 +1,23 @@
+import type { Provider } from "./types";
+import { upworkProvider } from "./upwork";
+import { customRssProvider } from "./custom-rss";
+import { freelancerProvider } from "./freelancer";
+import { peoplePerHourProvider } from "./peopleperhour";
+
+/**
+ * Provider registry. To add a marketplace: implement the Provider interface in
+ * providers/<name>.ts and add it to this array. Everything else (the cron
+ * loop, matching, dedup, notifications) works automatically.
+ */
+export const ALL_PROVIDERS: Provider[] = [
+  upworkProvider,
+  customRssProvider,
+  freelancerProvider,
+  peoplePerHourProvider,
+];
+
+/** Only the providers that are implemented and turned on. */
+export const enabledProviders = (): Provider[] =>
+  ALL_PROVIDERS.filter((p) => p.enabled);
+
+export type { Provider, Job, ProviderContext } from "./types";
