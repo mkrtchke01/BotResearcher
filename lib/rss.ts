@@ -18,6 +18,16 @@ const parser = new XMLParser({
   ignoreAttributes: false,
   attributeNamePrefix: "@_",
   trimValues: true,
+  // Public/user-provided job feeds routinely contain thousands of standard
+  // HTML entities (&amp;, &#39;, …). fast-xml-parser caps *total* entity
+  // expansions at 1000 by default as a DoS guard, which large but legitimate
+  // feeds exceed. Pass processEntities as an object to raise the cap to a
+  // high-but-bounded value, keeping protection against pathological inputs.
+  processEntities: {
+    enabled: true,
+    maxTotalExpansions: 500_000,
+    maxExpandedLength: 10_000_000,
+  },
 });
 
 const FETCH_TIMEOUT_MS = 12_000;
