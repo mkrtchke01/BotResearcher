@@ -23,11 +23,36 @@ export interface RunResult {
   notified: number;
   recipients: number;
   errors: string[];
+  /** Per-stage wall-clock in ms, for diagnosing slow/hanging runs. */
+  timings: Record<string, number>;
 }
 
 function jobKey(job: Job): string {
   return `${job.platform}:${job.id}`;
 }
+
+/** Hard timeout wrapper — rejects if `p` doesn't settle within `ms`. */
+function withTimeout<T>(p: Promise<T>, ms: number, label: string): Promise<T> {
+  return new Promise<T>((resolve, reject) => {
+    const timer = setTimeout(
+      () => reject(new Error(`${label} timed out after ${ms}ms`)),
+      ms,
+    );
+    p.then(
+      (v) => {
+        clearTimeout(timer);
+        resolve(v);
+      },
+      (e) => {
+        clearTimeout(timer);
+        reject(e);
+      },
+    );
+  });
+}
+
+/** Per-provider fetch budget. Belt-and-suspenders over the feed-level abort. */
+const PROVIDER_TIMEOUT_MS = 15_000;
 
 /**
  * One full monitoring cycle:
@@ -50,6 +75,11 @@ export async function runMonitorCycle(): Promise<RunResult> {
     notified: 0,
     recipients: 0,
     errors: [],
+    timings: {},
+  };
+  const start = Date.now();
+  const mark = (label: string) => {
+    result.timings[label] = Date.now() - start;
   };
 
   if (!(await getMonitoring())) {
@@ -63,6 +93,7 @@ export async function runMonitorCycle(): Promise<RunResult> {
     getSources(true),
     getActiveChatIds(),
   ]);
+  mark("config");
 
   // Notify every active /start user, plus the default chat id if configured.
   const recipients = new Set<number | string>(chatIds);
@@ -78,22 +109,32 @@ export async function runMonitorCycle(): Promise<RunResult> {
     return result;
   }
 
-  // 2. Fetch from providers in parallel; each provider isolates its own errors.
+  // 2. Fetch from providers in parallel; each provider isolates its own errors
+  // and is hard-capped by PROVIDER_TIMEOUT_MS so a hanging feed can never eat
+  // the whole function budget (which previously caused a 504 gateway timeout).
   const ctx = { keywords, sources };
   const fetched: Job[] = [];
   await Promise.all(
     enabledProviders().map(async (p) => {
+      const pStart = Date.now();
       try {
-        const jobs = await p.fetchJobs(ctx);
+        const jobs = await withTimeout(
+          p.fetchJobs(ctx),
+          PROVIDER_TIMEOUT_MS,
+          `provider ${p.key}`,
+        );
         fetched.push(...jobs);
       } catch (err) {
         const msg = `provider ${p.key} failed: ${String(err)}`;
         console.error("[monitor]", msg);
         result.errors.push(msg);
+      } finally {
+        result.timings[`fetch:${p.key}`] = Date.now() - pStart;
       }
     }),
   );
   result.fetched = fetched.length;
+  mark("fetch");
 
   // 3. Keyword match.
   const matched: Job[] = [];
@@ -102,6 +143,7 @@ export async function runMonitorCycle(): Promise<RunResult> {
     if (hits.length > 0) matched.push({ ...job, matchedKeywords: hits });
   }
   result.matched = matched.length;
+  mark("match");
   if (matched.length === 0) return result;
 
   // 4. Duplicate protection. Collapse in-batch dupes first, then check the DB.
@@ -125,6 +167,7 @@ export async function runMonitorCycle(): Promise<RunResult> {
     fresh.push(job);
   }
   result.fresh = fresh.length;
+  mark("dedup");
   if (fresh.length === 0) return result;
 
   // Send newest first, capped to avoid a flood on the very first run.
@@ -156,6 +199,7 @@ export async function runMonitorCycle(): Promise<RunResult> {
     }
   }
 
+  mark("notify");
   if (fresh.length > toSend.length) {
     console.warn(
       `[monitor] capped notifications: ${fresh.length - toSend.length} fresh jobs deferred to next run`,

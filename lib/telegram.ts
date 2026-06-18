@@ -23,6 +23,8 @@ export async function sendMessage(
   text: string,
   opts: SendMessageOptions = {},
 ): Promise<boolean> {
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), 8_000);
   try {
     const res = await fetch(apiUrl("sendMessage"), {
       method: "POST",
@@ -34,6 +36,7 @@ export async function sendMessage(
         disable_web_page_preview: opts.disablePreview ?? false,
         disable_notification: opts.disableNotification ?? false,
       }),
+      signal: controller.signal,
     });
     if (!res.ok) {
       const body = await res.text();
@@ -44,6 +47,8 @@ export async function sendMessage(
   } catch (err) {
     console.error("[telegram] sendMessage failed:", err);
     return false;
+  } finally {
+    clearTimeout(timer);
   }
 }
 

@@ -30,7 +30,9 @@ const parser = new XMLParser({
   },
 });
 
-const FETCH_TIMEOUT_MS = 12_000;
+// Kept well under the serverless function budget so a single slow/blocked
+// feed aborts gracefully instead of hanging the whole cron run.
+const FETCH_TIMEOUT_MS = 8_000;
 
 export async function fetchFeed(url: string): Promise<FeedItem[]> {
   const controller = new AbortController();
