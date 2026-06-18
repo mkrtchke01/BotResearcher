@@ -16,7 +16,11 @@ const globalForDb = globalThis as unknown as {
 export const sql =
   globalForDb.__sql ??
   postgres(env.databaseUrl, {
-    max: 1, // one connection per warm function instance
+    // Several small connections rather than one. postgres.js pipelines
+    // concurrent queries onto a single connection, which HANGS against
+    // Supabase's pgBouncer transaction pooler. Giving concurrent queries
+    // separate connections avoids the pipelining stall.
+    max: 5,
     idle_timeout: 20,
     connect_timeout: 10,
     prepare: false, // required for transaction-pooling (Supabase pgBouncer)

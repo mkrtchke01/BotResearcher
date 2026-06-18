@@ -88,11 +88,11 @@ export async function runMonitorCycle(): Promise<RunResult> {
   }
   result.ran = true;
 
-  const [keywords, sources, chatIds] = await Promise.all([
-    getKeywords(),
-    getSources(true),
-    getActiveChatIds(),
-  ]);
+  // Sequential (not Promise.all): pipelining concurrent queries onto the
+  // Supabase transaction pooler hangs. Each is ~1s, so this is cheap.
+  const keywords = await getKeywords();
+  const sources = await getSources(true);
+  const chatIds = await getActiveChatIds();
   mark("config");
 
   // Notify every active /start user, plus the default chat id if configured.
