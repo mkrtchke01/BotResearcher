@@ -32,7 +32,14 @@ async function run(req: NextRequest): Promise<NextResponse> {
     return NextResponse.json({ ok: false, error: "unauthorized" }, { status: 401 });
   }
   try {
-    const result = await runMonitorCycle();
+    // Global deadline well under maxDuration so the function returns a JSON
+    // diagnostic instead of letting the platform 504 it on an unexpected hang.
+    const result = await Promise.race([
+      runMonitorCycle(),
+      new Promise<never>((_, reject) =>
+        setTimeout(() => reject(new Error("monitor cycle exceeded 45s deadline")), 45_000),
+      ),
+    ]);
     return NextResponse.json({ ok: true, ...result });
   } catch (err) {
     // Defensive: runMonitorCycle is designed not to throw, but never 500 the cron.
