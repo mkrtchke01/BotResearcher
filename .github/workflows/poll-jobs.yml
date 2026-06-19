@@ -1,0 +1,40 @@
+name: Poll jobs every 10 minutes
+
+# Vercel Hobby only runs cron jobs once per day (more frequent schedules FAIL
+# the deployment), so the real polling cadence comes from here instead. This
+# workflow pings the deployed cron endpoint, which runs one monitoring cycle.
+#
+# Setup (one time): in the GitHub repo → Settings → Secrets and variables →
+# Actions, add two repository secrets:
+#   APP_URL      e.g. https://your-app.vercel.app   (no trailing slash)
+#   CRON_SECRET  the same value set in Vercel env
+#
+# Notes:
+#   - GitHub's scheduler is best-effort and can run a few minutes late under
+#     load; it also pauses after ~60 days of repo inactivity. Re-enable from the
+#     Actions tab if that happens. For stricter timing use cron-job.org instead.
+#   - The endpoint is safe to call often: it dedups and respects the 24h window.
+
+on:
+  schedule:
+    - cron: "*/10 * * * *"
+  workflow_dispatch: {} # allow manual "Run workflow" from the Actions tab
+
+# Don't pile up overlapping runs if one is slow.
+concurrency:
+  group: poll-jobs
+  cancel-in-progress: false
+
+jobs:
+  poll:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Trigger monitoring cycle
+        run: |
+          if [ -z "${{ secrets.APP_URL }}" ] || [ -z "${{ secrets.CRON_SECRET }}" ]; then
+            echo "::error::APP_URL and CRON_SECRET repo secrets must be set."
+            exit 1
+          fi
+          curl -fsS --max-time 90 \
+            -H "Authorization: Bearer ${{ secrets.CRON_SECRET }}" \
+            "${{ secrets.APP_URL }}/api/cron/check-jobs"

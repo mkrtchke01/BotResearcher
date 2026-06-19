@@ -193,12 +193,18 @@ To receive Telegram updates locally, expose port 3000 with a tunnel
    (New Project → select the repo → framework auto-detected as Next.js).
 5. Add environment variables (next section) **before** the first deploy.
 6. Deploy. Vercel reads `vercel.json` and registers the cron job
-   (`/api/cron/check-jobs` every 15 minutes).
+   (`/api/cron/check-jobs`, once daily — see the plan note below).
 
-> **Cron frequency & plan limits:** Vercel Hobby runs cron jobs at most a few
-> times per day. For minute-level polling (`*/15 * * * *`) use the **Pro** plan,
-> or trigger the cron route from an external scheduler (cron-job.org, GitHub
-> Actions) hitting `GET /api/cron/check-jobs?secret=<CRON_SECRET>`.
+> **Cron frequency & plan limits — important:** Vercel **Hobby only allows
+> cron jobs that run once per day**; a more frequent `schedule` in `vercel.json`
+> (e.g. `*/10 * * * *`) makes the **deployment fail outright**. So `vercel.json`
+> ships a once-daily schedule as a safe baseline. For real every-10-minutes
+> polling, either upgrade to **Pro** (then set `*/10 * * * *`), or keep Hobby
+> and use the included **GitHub Actions** workflow
+> [`.github/workflows/poll-jobs.yml`](.github/workflows/poll-jobs.yml), which
+> pings `GET /api/cron/check-jobs` every 10 min. Add `APP_URL` and `CRON_SECRET`
+> as repo secrets (Settings → Secrets and variables → Actions). cron-job.org
+> works too if you want stricter timing.
 
 ---
 
