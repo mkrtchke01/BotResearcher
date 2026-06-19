@@ -4,7 +4,7 @@ import { matchKeywords } from "./matcher";
 import { normalizeUrl } from "./format";
 import { formatJobMessage } from "./notify";
 import { broadcast } from "./telegram";
-import { env, MAX_NOTIFICATIONS_PER_CHECK } from "./env";
+import { env, MAX_NOTIFICATIONS_PER_CHECK, MAX_JOB_AGE_HOURS } from "./env";
 import {
   getMonitoring,
   getKeywords,
@@ -136,11 +136,34 @@ export async function runMonitorCycle(): Promise<RunResult> {
   result.fetched = fetched.length;
   mark("fetch");
 
-  // 3. Keyword match.
+  // 3. Keyword match + freshness window.
+  //
+  // Freshness: only consider jobs posted within MAX_JOB_AGE_HOURS (default 24h).
+  // This drops stale postings, including old jobs that boards re-surface by
+  // bumping (LaborX sort=newest mixes those in). A job with no parseable
+  // postedAt is kept — age unknown, and dedup still prevents repeat sends.
+  //
+  // Matching: a provider may pre-tag a job as relevant (non-empty
+  // matchedKeywords) when it already filtered server-side — e.g. Freelancer
+  // filters by skill id, so its results are kept even if the free-text keyword
+  // matcher finds nothing, and any text hits are merged in. Providers that
+  // return an empty matchedKeywords (Upwork, RSS, LaborX) behave as before:
+  // they're kept only when a keyword matches.
+  const maxAgeMs = MAX_JOB_AGE_HOURS * 3_600_000;
+  const withinWindow = (job: Job): boolean => {
+    if (!job.postedAt) return true;
+    const t = Date.parse(job.postedAt);
+    return Number.isNaN(t) ? true : start - t <= maxAgeMs;
+  };
   const matched: Job[] = [];
   for (const job of fetched) {
+    if (!withinWindow(job)) continue;
+    const provided = job.matchedKeywords ?? [];
     const hits = matchKeywords(job.title, job.description, keywords);
-    if (hits.length > 0) matched.push({ ...job, matchedKeywords: hits });
+    const merged = provided.length
+      ? [...new Set([...provided, ...hits])]
+      : hits;
+    if (merged.length > 0) matched.push({ ...job, matchedKeywords: merged });
   }
   result.matched = matched.length;
   mark("match");
@@ -170,7 +193,8 @@ export async function runMonitorCycle(): Promise<RunResult> {
   mark("dedup");
   if (fresh.length === 0) return result;
 
-  // Send newest first, capped to avoid a flood on the very first run.
+  // Send newest first. Unlimited by default (MAX_NOTIFICATIONS_PER_CHECK is
+  // Infinity unless overridden), so slice() simply returns all fresh matches.
   fresh.sort((a, b) => {
     const ta = a.postedAt ? Date.parse(a.postedAt) : 0;
     const tb = b.postedAt ? Date.parse(b.postedAt) : 0;

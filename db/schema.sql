@@ -55,16 +55,34 @@ CREATE INDEX IF NOT EXISTS idx_sent_jobs_sent_at  ON sent_jobs (sent_at);
 
 -- ----------------------------------------------------------------------------
 -- Seed default keywords (idempotent). Edit/extend via the /addkeyword command.
+--
+-- Tuned for three target niches: LANDING PAGES, BOTS, WEB APPLICATIONS.
+-- Matching (lib/matcher.ts) is case-insensitive with word boundaries and treats
+-- spaces / "-" / "_" / "/" as flexible separators, so e.g. "web app" also
+-- matches "web-app" and "web_app". Boundaries are strict on plurals, so a
+-- standalone short form (e.g. "landing") is seeded alongside the phrase to also
+-- catch "landing pages". Remove any you find too broad with /removekeyword.
 -- ----------------------------------------------------------------------------
 INSERT INTO keywords (keyword) VALUES
+  -- Landing pages
+  ('landing'),
   ('landing page'),
-  ('web application'),
+  -- Bots ("bot" alone catches "telegram bot", "trading bot", "mev bot", …;
+  --  "chatbot" has no boundary so it is listed explicitly)
+  ('bot'),
+  ('chatbot'),
   ('telegram bot'),
-  ('telegram web app'),
-  ('saas website'),
-  ('ui/ux design'),
-  ('web design'),
-  ('react'),
-  ('next.js'),
-  ('frontend development')
+  ('discord bot'),
+  ('trading bot'),
+  ('telegram mini app'),
+  -- Web applications
+  ('web app'),
+  ('webapp'),
+  ('web application'),
+  ('web applications'),
+  ('web platform'),
+  ('dapp'),
+  ('saas'),
+  ('full stack'),
+  ('web development')
 ON CONFLICT (keyword) DO NOTHING;

@@ -68,7 +68,8 @@ BotResearcher/
 │   ├── index.ts                         # provider registry
 │   ├── upwork.ts                        # Upwork RSS provider
 │   ├── custom-rss.ts                    # generic RSS/Atom provider
-│   ├── freelancer.ts                    # placeholder (official API)
+│   ├── laborx.ts                        # LaborX public API (newest jobs)
+│   ├── freelancer.ts                    # Freelancer.com public API (skill-filtered)
 │   └── peopleperhour.ts                 # placeholder (sanctioned feed/API)
 ├── db/
 │   └── schema.sql                       # database schema + seed keywords
@@ -262,6 +263,21 @@ Then open Telegram and send **`/start`** to your bot.
 
 Only **public / official / user-provided** feeds are used. No login, captcha,
 rate-limit, or protected-page bypassing.
+
+**API-driven providers (no source needed — on by default):**
+
+- **LaborX** (`providers/laborx.ts`): polls the public job-board API for the
+  newest jobs each run; relevance is decided by your **keywords** (landing / bot
+  / web-application seeds ship in `db/schema.sql`). Tune with `/addkeyword` and
+  `/removekeyword`. Optional env: `LABORX_FETCH_LIMIT` (default 50).
+- **Freelancer.com** (`providers/freelancer.ts`): polls the public active-
+  projects API filtered **server-side by skill id** for the three niches
+  (landing pages / bots / web applications), newest first. Edit `SKILL_BUCKETS`
+  in that file to widen/narrow coverage (skill ids:
+  `GET https://www.freelancer.com/api/projects/0.1/jobs/?lang=en`). Each result
+  is pre-tagged with its niche, so it isn't dropped by the text matcher.
+
+**Feed-driven providers (add a source URL):**
 
 - **Upwork**: create a job search while logged in; the results page exposes an
   **RSS** link tied to your account. Add it with platform `upwork`:

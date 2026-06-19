@@ -18,15 +18,20 @@ interface SendMessageOptions {
   disableNotification?: boolean;
 }
 
-export async function sendMessage(
+/** Cap how long we'll wait out a Telegram 429 so a cron run can't hang. */
+const MAX_RETRY_AFTER_MS = 5_000;
+
+const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
+
+async function postSendMessage(
   chatId: number | string,
   text: string,
-  opts: SendMessageOptions = {},
-): Promise<boolean> {
+  opts: SendMessageOptions,
+): Promise<Response> {
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), 8_000);
   try {
-    const res = await fetch(apiUrl("sendMessage"), {
+    return await fetch(apiUrl("sendMessage"), {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
@@ -38,6 +43,31 @@ export async function sendMessage(
       }),
       signal: controller.signal,
     });
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
+export async function sendMessage(
+  chatId: number | string,
+  text: string,
+  opts: SendMessageOptions = {},
+): Promise<boolean> {
+  try {
+    let res = await postSendMessage(chatId, text, opts);
+
+    // Telegram throttles with HTTP 429 + parameters.retry_after (seconds). When
+    // sending a backlog this is expected; wait it out once and retry so the
+    // notification isn't dropped (and then marked sent → lost forever).
+    if (res.status === 429) {
+      const body = await res.clone().json().catch(() => null);
+      const retryAfter = Number(body?.parameters?.retry_after) || 1;
+      const waitMs = Math.min(retryAfter * 1000, MAX_RETRY_AFTER_MS);
+      console.warn(`[telegram] 429 for chat ${chatId}; retrying in ${waitMs}ms`);
+      await sleep(waitMs);
+      res = await postSendMessage(chatId, text, opts);
+    }
+
     if (!res.ok) {
       const body = await res.text();
       console.error(`[telegram] sendMessage ${res.status}: ${body}`);
@@ -47,8 +77,6 @@ export async function sendMessage(
   } catch (err) {
     console.error("[telegram] sendMessage failed:", err);
     return false;
-  } finally {
-    clearTimeout(timer);
   }
 }
 

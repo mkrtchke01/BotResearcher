@@ -1,6 +1,7 @@
 import type { Provider } from "./types";
 import { upworkProvider } from "./upwork";
 import { customRssProvider } from "./custom-rss";
+import { laborxProvider } from "./laborx";
 import { freelancerProvider } from "./freelancer";
 import { peoplePerHourProvider } from "./peopleperhour";
 
@@ -12,6 +13,7 @@ import { peoplePerHourProvider } from "./peopleperhour";
 export const ALL_PROVIDERS: Provider[] = [
   upworkProvider,
   customRssProvider,
+  laborxProvider,
   freelancerProvider,
   peoplePerHourProvider,
 ];

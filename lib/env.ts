@@ -41,8 +41,41 @@ export const env = {
   },
 };
 
-/** Max notifications to send per cron run, to avoid spamming on first sync. */
-export const MAX_NOTIFICATIONS_PER_CHECK = 10;
+/**
+ * Max notifications to send per cron run. Unlimited by default — every fresh
+ * match is sent immediately. Set MAX_NOTIFICATIONS_PER_CHECK to a positive
+ * integer if you want to cap the first-run backlog flood; 0 or unset means no
+ * cap. (Telegram rate limits are handled with a 429-aware retry in telegram.ts.)
+ */
+export const MAX_NOTIFICATIONS_PER_CHECK = (() => {
+  const raw = Number(optional("MAX_NOTIFICATIONS_PER_CHECK") ?? "0");
+  return Number.isFinite(raw) && raw > 0 ? raw : Number.POSITIVE_INFINITY;
+})();
 
 /** Max jobs a single source may contribute per run (defensive cap). */
 export const MAX_JOBS_PER_SOURCE = 50;
+
+/** Base URL of the public LaborX job-board API (override only for testing). */
+export const LABORX_API_URL =
+  optional("LABORX_API_URL") ?? "https://api.laborx.com";
+
+/**
+ * How many newest LaborX jobs to pull per run. Must comfortably exceed the
+ * number of jobs posted between two cron runs so nothing is missed; the whole
+ * board posts well under 50/run at any sane interval. Capped defensively.
+ */
+export const LABORX_FETCH_LIMIT = Math.min(
+  Number(optional("LABORX_FETCH_LIMIT") ?? "50") || 50,
+  MAX_JOBS_PER_SOURCE,
+);
+
+/**
+ * Freshness window: only notify about jobs posted within this many hours.
+ * Drops stale postings — including old jobs that boards re-surface by bumping
+ * (e.g. LaborX sort=newest). Jobs with no parseable post date are kept (age
+ * unknown). Default 24h. Set MAX_JOB_AGE_HOURS to override.
+ */
+export const MAX_JOB_AGE_HOURS = (() => {
+  const raw = Number(optional("MAX_JOB_AGE_HOURS") ?? "24");
+  return Number.isFinite(raw) && raw > 0 ? raw : 24;
+})();
