@@ -121,7 +121,7 @@ function buildUrl(): string {
 export const freelancerProvider: Provider = {
   key: "freelancer",
   displayName: PLATFORM,
-  enabled: true,
+  enabled: false, // disabled — kwork-only monitoring
 
   async fetchJobs(_ctx: ProviderContext): Promise<Job[]> {
     const controller = new AbortController();

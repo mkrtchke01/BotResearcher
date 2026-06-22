@@ -100,12 +100,13 @@ export async function runMonitorCycle(): Promise<RunResult> {
   if (env.telegramChatId) recipients.add(env.telegramChatId);
   result.recipients = recipients.size;
 
-  if (keywords.length === 0) {
-    result.reason = "no keywords configured";
-    return result;
-  }
-  if (sources.length === 0) {
-    result.reason = "no sources configured";
+  // Don't hard-require keywords or sources: providers that filter server-side
+  // and pre-tag their results (kwork → category 37, freelancer → skill ids)
+  // produce matches without either. RSS providers that DO need sources simply
+  // return [] when they have none. Only a complete lack of enabled providers
+  // means there's nothing to do.
+  if (enabledProviders().length === 0) {
+    result.reason = "no providers enabled";
     return result;
   }
 

@@ -1,4 +1,4 @@
-name: Poll jobs every 10 minutes
+name: Poll jobs every minute
 
 # Vercel Hobby only runs cron jobs once per day (more frequent schedules FAIL
 # the deployment), so the real polling cadence comes from here instead. This
@@ -10,14 +10,20 @@ name: Poll jobs every 10 minutes
 #   CRON_SECRET  the same value set in Vercel env
 #
 # Notes:
-#   - GitHub's scheduler is best-effort and can run a few minutes late under
-#     load; it also pauses after ~60 days of repo inactivity. Re-enable from the
-#     Actions tab if that happens. For stricter timing use cron-job.org instead.
+#   - We ASK for every minute below, but GitHub's scheduler is best-effort: the
+#     documented floor is 5 minutes and under load it commonly fires every
+#     ~5-10 min and silently SKIPS ticks. So this is "as often as GitHub will
+#     allow", not a guaranteed 60s cadence. For true 1-minute polling, point an
+#     external scheduler (cron-job.org, EasyCron, an uptime monitor, …) at
+#     GET <APP_URL>/api/cron/check-jobs with header
+#     `Authorization: Bearer <CRON_SECRET>` — same endpoint, real 1-min ticks.
+#   - The scheduler also pauses after ~60 days of repo inactivity. Re-enable
+#     from the Actions tab if that happens.
 #   - The endpoint is safe to call often: it dedups and respects the 24h window.
 
 on:
   schedule:
-    - cron: "*/10 * * * *"
+    - cron: "* * * * *"
   workflow_dispatch: {} # allow manual "Run workflow" from the Actions tab
 
 # Don't pile up overlapping runs if one is slow.

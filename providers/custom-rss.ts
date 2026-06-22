@@ -33,7 +33,7 @@ function itemId(guid: string | null, link: string): string {
 export const customRssProvider: Provider = {
   key: "custom-rss",
   displayName: PLATFORM,
-  enabled: true,
+  enabled: false, // disabled — kwork-only monitoring
 
   async fetchJobs(ctx: ProviderContext): Promise<Job[]> {
     const feeds = ctx.sources.filter(

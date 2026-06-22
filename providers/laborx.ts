@@ -96,7 +96,7 @@ async function fetchNewest(limit: number): Promise<LaborXJob[]> {
 export const laborxProvider: Provider = {
   key: "laborx",
   displayName: PLATFORM,
-  enabled: true,
+  enabled: false, // disabled — kwork-only monitoring
 
   async fetchJobs(_ctx: ProviderContext): Promise<Job[]> {
     try {

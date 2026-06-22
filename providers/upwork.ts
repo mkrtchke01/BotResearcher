@@ -48,7 +48,7 @@ function parseUpworkId(link: string, guid: string | null): string {
 export const upworkProvider: Provider = {
   key: "upwork",
   displayName: PLATFORM,
-  enabled: true,
+  enabled: false, // disabled — kwork-only monitoring
 
   async fetchJobs(ctx: ProviderContext): Promise<Job[]> {
     const feeds = ctx.sources.filter((s) => s.platform === "upwork" && s.enabled);
