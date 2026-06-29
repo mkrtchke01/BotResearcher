@@ -1,6 +1,6 @@
 import { enabledProviders } from "@/providers";
 import type { Job } from "@/providers/types";
-import { matchKeywords } from "./matcher";
+import { matchKeywords, hasExcludedKeyword } from "./matcher";
 import { normalizeUrl } from "./format";
 import { formatJobMessage } from "./notify";
 import { broadcast } from "./telegram";
@@ -159,6 +159,9 @@ export async function runMonitorCycle(): Promise<RunResult> {
   const matched: Job[] = [];
   for (const job of fetched) {
     if (!withinWindow(job)) continue;
+    // Hard exclusion: drop jobs mentioning WordPress / WP / Tilda, even if they
+    // were pre-tagged or match a positive keyword.
+    if (hasExcludedKeyword(job.title, job.description)) continue;
     const provided = job.matchedKeywords ?? [];
     const hits = matchKeywords(job.title, job.description, keywords);
     const merged = provided.length

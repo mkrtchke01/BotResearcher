@@ -47,3 +47,21 @@ export function matchKeywords(
   }
   return matched;
 }
+
+/**
+ * Keywords that disqualify a job regardless of any positive match. Matched
+ * case-insensitively with word boundaries (so "WP" won't hit inside "swap").
+ */
+export const EXCLUDE_KEYWORDS = ["WordPress", "WP", "Tilda"];
+
+/**
+ * True if the job's title/description mentions any excluded keyword. Such jobs
+ * should be dropped even when they match the positive keywords.
+ */
+export function hasExcludedKeyword(
+  title: string,
+  description: string,
+): boolean {
+  const haystack = `${title} \n ${stripHtml(description)}`.toLowerCase();
+  return EXCLUDE_KEYWORDS.some((kw) => patternFor(kw).test(haystack));
+}
